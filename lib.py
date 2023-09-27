@@ -4,6 +4,7 @@ from imports_and_constants import *
 def copy_file(src, dst):
     shutil.copyfile(src, dst)
 
+
 def load_json(file_name):
     try:
         with open(file_name, "r") as file:
@@ -14,14 +15,107 @@ def load_json(file_name):
             with open(file_name, "r") as file:
                 return json.load(file)
         else:
-            raise json.decoder.JSONDecodeError("JSON file is corrupted and no backup exists", "", 0)
-        
+            # raise json.decoder.JSONDecodeError(
+            #     "JSON file is corrupted and no backup exists", "", 0)
+            print("JSON file is corrupted and no backup exists")
+            return {}
+
+
+
 def save_json(file_name, data):
     if os.path.exists(file_name):
         copy_file(file_name, file_name + ".old")
 
     with open(file_name, "w") as file:
         json.dump(data, file, indent=2)
+
+
+def initialize_guild(guild):
+    guildID = guild.id
+    os.mkdir(os.path.join("data/guilds/", str(guildID)))
+    save_json(os.path.join("data/guilds/", str(guildID),
+              "settings.json"), default_settings)
+    save_json(os.path.join("data/guilds/", str(guildID), "meta.json"),
+              {
+        "name": guild.name,
+        "id": guildID,
+        "owner": guild.owner_id,
+        "icon": guild.icon_url,
+    })
+    save_json(os.path.join("data/guilds/", str(guildID),
+              "text_xp.json"), {}) # {"userid": xp}
+    save_json(os.path.join("data/guilds/", str(guildID),
+              "voice_session_time.json"), {}) # {"userid": time_started}
+    save_json(os.path.join("data/guilds/", str(guildID),
+              "voice_xp.json"), {}) # {"userid": {"xp": xp, ... etc}}}
+    
+
+
+def change_settings_for_guild(guild, setting, value):
+    guildID = guild.id
+    if not os.path.exists(os.path.join("data/guilds/", str(guildID))):
+        initialize_guild(guild)
+    settings = load_json(os.path.join("data/guilds/", str(guildID),"settings.json"))
+    settings[setting] = value
+    save_json(os.path.join("data/guilds/", str(guildID),"settings.json"), settings)
+
+def get_settings_for_guild(guild):
+    guildID = guild.id
+    if not os.path.exists(os.path.join("data/guilds/", str(guildID))):
+        initialize_guild(guild)
+    settings = load_json(os.path.join("data/guilds/", str(guildID),"settings.json"))
+    return settings
+
+
+
+def get_active_voice_sessions(guild):
+    guildID = guild.id
+    if not os.path.exists(os.path.join("data/guilds/", str(guildID))):
+        initialize_guild(guild)
+    voice_session_time = load_json(os.path.join("data/guilds/", str(guildID),"voice_session_time.json"))
+    return voice_session_time # {"userid": time_started, ... etc}
+
+def set_voice_session_start(guild, userID, start):
+    guildID = guild.id
+    if not os.path.exists(os.path.join("data/guilds/", str(guildID))):
+        initialize_guild(guild)
+    voice_session_time = load_json(os.path.join("data/guilds/", str(guildID),"voice_session_time.json"))
+    voice_session_time[str(userID)] = start
+    save_json(os.path.join("data/guilds/", str(guildID),"voice_session_time.json"), voice_session_time)
+
+def remove_voice_session(guild, userID):
+    guildID = guild.id
+    if not os.path.exists(os.path.join("data/guilds/", str(guildID))):
+        initialize_guild(guild)
+    voice_session_time = load_json(os.path.join("data/guilds/", str(guildID),"voice_session_time.json"))
+    del voice_session_time[str(userID)]
+    save_json(os.path.join("data/guilds/", str(guildID),"voice_session_time.json"), voice_session_time)
+
+
+def add_voice_xp(guild, userID, xp):
+    guildID = guild.id
+    if not os.path.exists(os.path.join("data/guilds/", str(guildID))):
+        initialize_guild(guild)
+    
+    voicexp = load_json(os.path.join("data/guilds/", str(guildID),"voice_xp.json"))
+    if not str(userID) in voicexp:
+        voicexp[str(userID)] = 0
+    voicexp[str(userID)] += xp
+    save_json(os.path.join("data/guilds/", str(guildID),"voice_xp.json"), voicexp)
+
+
+def get_voice_xp(guild, userID):
+    guildID = guild.id
+    if not os.path.exists(os.path.join("data/guilds/", str(guildID))):
+        initialize_guild(guild)
+    voicexp = load_json(os.path.join("data/guilds/", str(guildID),"voice_xp.json"))
+    if not str(userID) in voicexp:
+        return 0
+    return voicexp[str(userID)]
+
+
+
+
 
 if __name__ == "__main__":
     # save_json("test.json", {"cdb": "test"})

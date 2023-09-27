@@ -11,11 +11,16 @@ async def on_ready():
 
 
 def main():
+    
+
+
+
     task_queue = []#(timestamp, func, args, kwargs, is_async)
     background_loop = threading.Thread(target=start_background_loop, args=(task_queue,))
     background_loop.start()
 
-    
+    voice_xp_thread = threading.Thread(target=voice_xp)
+    voice_xp_thread.start()
 
 
 
