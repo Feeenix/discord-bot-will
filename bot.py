@@ -15,17 +15,21 @@ def main():
     background_loop = threading.Thread(target=start_background_loop, args=(task_queue,))
     background_loop.start()
 
+    
+
+
+
+
+
+
+
+
 
 
 
     with open('token.txt', 'r') as f:
         token = f.read()
     client.run(token)
-
-
-
-
-
 
 
 if __name__ == '__main__':
