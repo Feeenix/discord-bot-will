@@ -40,7 +40,7 @@ def initialize_guild(guild):
         "name": guild.name,
         "id": guildID,
         "owner": guild.owner_id,
-        # "icon": guild.icon,
+        "icon": guild.icon.url if guild.icon else None,
     })
     save_json(os.path.join("data/guilds/", str(guildID),
               "text_xp.json"), {}) # {"userid": xp}
@@ -48,6 +48,9 @@ def initialize_guild(guild):
               "voice_session_time.json"), {}) # {"userid": time_started}
     save_json(os.path.join("data/guilds/", str(guildID),
               "voice_xp.json"), {}) # {"userid": {"xp": xp, ... etc}}}
+    save_json(os.path.join("data/guilds/", str(guildID),
+              "events.json"), {}) # {"events":[{"timestamp": timestamp, "type": "message", "xp": xp, "userid": userid}, ... etc]]}
+    
     
 
 
@@ -149,6 +152,23 @@ def make_embed(title="", description="", color=0x00ff00, footer=None, image=None
         for field in fields:
             embed.add_field(name=field[0], value=field[1], inline=field[2])
     return embed
+
+def get_pretty_voice_leaderboard(guild,start,end):
+    guildID = guild.id
+    if not os.path.exists(os.path.join("data/guilds/", str(guildID))):
+        initialize_guild(guild)
+
+    voicexps = load_json(os.path.join("data/guilds/", str(guildID),"voice_xp.json"))
+    voicexps = [(struserid, int(userxp)) for struserid, userxp in voicexps.items()]
+    voicexps.sort(key=lambda x: x[1], reverse=True) # sort by xp
+    voicexps = voicexps[start:end]
+
+    if len(voicexps) == 0:
+        return "**The leaderboard is empty...**"
+    
+    numbers = [("🥇🥈🥉"[i] if i <= 2 else f"**#{i+1}**" ) for i in range(start,start+len(voicexps))]
+    names = [f"<@{userid}>\n<:spacer:1156978605759418388>Exp `{int(xp)}`" for userid, xp in voicexps]
+    return "\n".join([f"{numbers[i]} → {names[i]}" for i in range(len(numbers))])
 
 
 

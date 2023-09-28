@@ -33,9 +33,11 @@ def voice_xp():
                     active_users.extend([member.id for member in channel.members if not member.bot])
                     if len(channel.members) == 0:
                         continue
-                    # if len(channel.members) == 1:
-                    #     # if the user is alone in a voice channel
-                    #     continue #? maybe we should give them xp for being alone?  
+                    loneliness_modifier = 1
+                    if len(channel.members) == 1:
+                        loneliness_modifier = 0.8
+                        # if the user is alone in a voice channel
+                        # continue #? maybe we should give them xp for being alone?  
                     for member in channel.members:
                         if member.bot:
                             continue
@@ -65,7 +67,7 @@ def voice_xp():
                             print(member.id, "joined voice channel")
                         time_diff = this_time - last_poll
                         xp_rate_modifier = xp_rate(this_time - sessions[str(member.id)])
-                        xp = (time_diff * settings["voicexp"] * xp_modifier*xp_rate_modifier)
+                        xp = (time_diff * settings["voicexp"] * xp_modifier*xp_rate_modifier*loneliness_modifier)
                         add_voice_xp(guild, member.id, xp)
                         
 

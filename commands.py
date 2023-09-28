@@ -22,17 +22,24 @@ value:int = SlashOption(description="the value of the setting, in case of boolea
 
 
 
-
-@client.slash_command(name="voiceleaderboard",description="display the current voice leaderboard",
+#, default_member_permissions=nextcord.Permissions(manage_channels=True)
+@client.slash_command(name="voiceleaderboard",description="display the current voice leaderboard"
 )
-async def display_leaderboard(interaction: Interaction):
+async def display_leaderboard(interaction: Interaction,
+pagenum:int = SlashOption(description="Which page number to display", required = False,default=1, name="page"),
+                              ):
+    voice_xps = load_json(os.path.join("data/guilds/", str(interaction.guild.id),"voice_xp.json"))
+    len_voice_xps = len(voice_xps)
+    pagesize = 10
+    pagenum = max(1,min(pagenum,math.ceil(len_voice_xps/pagesize)))
     embed = make_embed(
-        title="Guild Name", 
-        description="this is the current practice room leaderboardasd\nWho is the best at practicing?\na\ns\nd\na\ns\nd\na\ns\na\na\na",
+        title=interaction.guild.name, 
+        description="This is the current practice room leaderboard.\nWho is the most hard working?\n\n"+get_pretty_voice_leaderboard(interaction.guild,(pagenum-1)*pagesize,(pagenum-1)*pagesize+pagesize) + (f"\n\nPage {pagenum}/{math.ceil(len_voice_xps/pagesize)}" if len_voice_xps > pagesize else ""),
         color=0xfceaa8,
         author="Practice Room Leaderboard",
-        top_icon_url=interaction.guild.icon if interaction.guild.icon else None,
+        thumbnail=interaction.guild.icon if interaction.guild.icon else None,
         )
+    
     # nextcord.Embed(title="Voice Leaderboard", description="this is the current voice leaderboard")
     
 
