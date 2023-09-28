@@ -277,7 +277,28 @@ def get_pretty_user_session_history(guild,userID,start,end):
     names.reverse()
     return "\n".join([f"{numbers[i]} → {names[i]}" for i in range(len(numbers))])
 
+def remove_user_sessions(guild, userID, index_1, index_2):
+    sessions = load_json(os.path.join("data/guilds/", str(guild.id),"practice_sessions.json"))
+    if not str(userID) in sessions:
+        return 0.0, 0.0,0
+    if len(sessions[str(userID)]) == 0:
+        return 0.0, 0.0,0
+    
+    amount = index_2 - index_1 + 1
+    removing = sessions[str(userID)][index_1-1:index_2]
+    xp_removed = sum([session["xp_gained"] for session in removing])
+    time_removed = sum([session["total_time"] for session in removing])
+    del sessions[str(userID)][index_1-1:index_2] # this is the line that actually removes the sessions
+    save_json(os.path.join("data/guilds/", str(guild.id),"practice_sessions.json"), sessions)
+    voicexp = load_json(os.path.join("data/guilds/", str(guild.id),"voice_xp.json"))
+    voicexp[str(userID)] -= xp_removed
+    save_json(os.path.join("data/guilds/", str(guild.id),"voice_xp.json"), voicexp)
+    voice_times = load_json(os.path.join("data/guilds/", str(guild.id),"voice_times.json"))
+    voice_times[str(userID)] -= time_removed
+    save_json(os.path.join("data/guilds/", str(guild.id),"voice_times.json"), voice_times)
 
+
+    return xp_removed, time_removed, amount
 
 if __name__ == "__main__":
     # save_json("test.json", {"cdb": "test"})

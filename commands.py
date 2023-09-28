@@ -77,14 +77,68 @@ pagenum:int = SlashOption(description="Which page number to display", required =
     return
 
 
-#, default_member_permissions=nextcord.Permissions(manage_channels=True)
-@client.slash_command(name="revertuser",description="revert a user's stats to a previous state using the session indices"
+
+@client.slash_command(name="removesessions",description="revert a user's stats to a previous state using the session indices", 
 )
-async def revertuser(interaction: Interaction,
+async def remove_sessions(interaction: Interaction,
                               user:nextcord.Member = SlashOption(description="Which user to display", required = True,default=None, name="user"),
-                              session_index:int = SlashOption(description="Which session index to revert to", required = True,default=None, name="session_index"),
+                              session_index_1:int = SlashOption(description="Remove sessions from this index (inclusive)", required = True,default=None, name="session_index_min"),
+                              session_index_2:int = SlashOption(description="remove sessions to this index (inclusive)", required = False,default=None, name="session_index_max"),
                               ):
-    sessions = load_json(os.path.join("data/guilds/", str(interaction.guild.id),"practice_sessions.json"))
+    if user.id != interaction.user.id:
+        if not interaction.user.guild_permissions.manage_channels or interaction.user.id != owner_id:
+            await interaction.response.send_message("You can only remove your own sessions", ephemeral=True)
+            return
+
     user = user if user else interaction.user
     userID = user.id
+    if session_index_2 is None:
+        session_index_1 = max(1,session_index_1)
+        session_index_2 = session_index_1
+    else:
+        session_index_1 = max(1,session_index_1)
+        session_index_2 = max(1,session_index_2)
+        session_index_1, session_index_2 = min(session_index_1, session_index_2), max(session_index_1, session_index_2)
+
+    
+    xp_removed, time_removed,sessions_removed = remove_user_sessions(interaction.guild, userID, session_index_1, session_index_2)
+    embed = make_embed(
+        title=f"{user.global_name}'s practice sessions.", 
+        description=f"Removed `{sessions_removed}` sessions (`{session_index_1}"+(f"-{session_index_1+sessions_removed-1}" if sessions_removed != 1 else "")+f"`), `{xp_removed:.0f}` xp and `{format_time(time_removed)}` of practice time.",
+        color=0xfceaa8,
+        thumbnail=user.avatar,
+        )
+    
+    
+
+    await interaction.response.send_message("", embed=embed)
+
     return
+
+
+
+@client.slash_command(name="unixtimestamp",description="make a unix timestamp from a date and time", 
+)
+async def unix_timestamp(interaction: Interaction,
+                                date:str = SlashOption(description="date in the format YYYY-MM-DD", required = True,default=None, name="date"),
+                                time:str = SlashOption(description="time in the format HH:MM", required = True,default=None, name="time"),
+                                hoursystem:str = SlashOption(description="AM or PM or 24 hour system", required = False,default="24", name="hoursystem", choices={"AM": "AM", "PM": "PM", "24": "24"}),
+                                timezone:int = SlashOption(description="timezone offset in hours, for UTC+4 write 4", required = False,default=0, name="timezone"),
+                                ):
+    if hoursystem == "24":
+        hoursystem = ""
+    else:
+        hoursystem = hoursystem.lower()
+    try:
+        if hoursystem == "":
+            timestamp = datetime.datetime.strptime(date+time, "%Y-%m-%d%H:%M")
+        else:
+            timestamp = datetime.datetime.strptime(date+time+hoursystem, "%Y-%m-%d%I:%M%p")
+    except:
+        await interaction.response.send_message("Invalid date or time", ephemeral=True)
+        return
+    timestamp = timestamp.replace(tzinfo=datetime.timezone(datetime.timedelta(hours=timezone)))
+    await interaction.response.send_message(f"Unix timestamp: `{timestamp.timestamp()}`")
+    return
+
+
