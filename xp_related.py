@@ -59,21 +59,26 @@ def voice_xp():
                             xp_modifier = 0.1
                         
                         this_time = time.time()
+                        if not str(member.id) in sessions:
+                            set_voice_session_start(guild, member.id, this_time)
+                            sessions[str(member.id)] = this_time
+                            print(member.id, "joined voice channel")
                         time_diff = this_time - last_poll
                         xp_rate_modifier = xp_rate(this_time - sessions[str(member.id)])
                         xp = (time_diff * settings["voicexp"] * xp_modifier*xp_rate_modifier)
                         add_voice_xp(guild, member.id, xp)
-                        if not str(member.id) in sessions:
-                            set_voice_session_start(guild, member.id, this_time)
+                        
 
                 to_be_removed = []
                 if len(sessions) != len(active_users):
-                    for userID in sessions:
-                        if not userID in active_users:
-                            to_be_removed.append(userID)
-                for userID in to_be_removed:
-                    remove_voice_session(guild, userID)
+                    for strUserID in sessions:
+                        if not strUserID in active_users:
+                            to_be_removed.append(strUserID)
+                
+                        print(strUserID, "left voice channel")
+                    remove_voice_session_list(guild, to_be_removed)
                     
-        print("voice xp loop")
+        # print("voice xp loop")
         last_poll = time.time()
         time.sleep(1)
+

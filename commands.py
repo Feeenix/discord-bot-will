@@ -19,3 +19,22 @@ value:int = SlashOption(description="the value of the setting, in case of boolea
     # interaction.response.defer() # let the user know we're working on it
     await interaction.response.send_message("working on it")
     return
+
+
+
+
+@client.slash_command(name="voiceleaderboard",description="display the current voice leaderboard",
+)
+async def display_leaderboard(interaction: Interaction):
+    embed = make_embed(
+        title="Guild Name", 
+        description="this is the current practice room leaderboardasd\nWho is the best at practicing?\na\ns\nd\na\ns\nd\na\ns\na\na\na",
+        color=0xfceaa8,
+        author="Practice Room Leaderboard",
+        top_icon_url=interaction.guild.icon if interaction.guild.icon else None,
+        )
+    # nextcord.Embed(title="Voice Leaderboard", description="this is the current voice leaderboard")
+    
+
+    await interaction.response.send_message("", embed=embed)
+    return

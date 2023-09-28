@@ -83,6 +83,16 @@ def set_voice_session_start(guild, userID, start):
     voice_session_time[str(userID)] = start
     save_json(os.path.join("data/guilds/", str(guildID),"voice_session_time.json"), voice_session_time)
 
+
+def remove_voice_session_list(guild, list_of_userIDs): # more efficient than calling remove_voice_session for each user
+    guildID = guild.id
+    if not os.path.exists(os.path.join("data/guilds/", str(guildID))):
+        initialize_guild(guild)
+    voice_session_time = load_json(os.path.join("data/guilds/", str(guildID),"voice_session_time.json"))
+    for userID in list_of_userIDs:
+        del voice_session_time[str(userID)]
+    save_json(os.path.join("data/guilds/", str(guildID),"voice_session_time.json"), voice_session_time)
+
 def remove_voice_session(guild, userID):
     guildID = guild.id
     if not os.path.exists(os.path.join("data/guilds/", str(guildID))):
@@ -123,6 +133,22 @@ def xp_rate(session_time):
         return 1
     return 2**(-((session_time-60*60*2.5)/3600)*2)
 
+
+def make_embed(title="", description="", color=0x00ff00, footer=None, image=None, thumbnail=None, author=None,
+               fields=None, top_icon_url="", bottom_icon_url="", url=""):
+    embed = nextcord.Embed(title=title, description=description, color=color, url=url)
+    if footer: embed.set_footer(text=footer, icon_url=bottom_icon_url)
+    if image:  embed.set_image(url=image)
+    if thumbnail: embed.set_thumbnail(url=thumbnail)
+    if top_icon_url == None:
+        top_icon_url = ""
+    if bottom_icon_url == None:
+        bottom_icon_url = ""
+    if author: embed.set_author(name=author, icon_url=top_icon_url)
+    if fields:
+        for field in fields:
+            embed.add_field(name=field[0], value=field[1], inline=field[2])
+    return embed
 
 
 
