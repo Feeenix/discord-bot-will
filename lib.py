@@ -40,7 +40,7 @@ def initialize_guild(guild):
         "name": guild.name,
         "id": guildID,
         "owner": guild.owner_id,
-        "icon": guild.icon_url,
+        # "icon": guild.icon,
     })
     save_json(os.path.join("data/guilds/", str(guildID),
               "text_xp.json"), {}) # {"userid": xp}
@@ -113,6 +113,15 @@ def get_voice_xp(guild, userID):
         return 0
     return voicexp[str(userID)]
 
+
+
+
+def xp_rate(session_time):
+    if session_time < 60*5:
+        return session_time / (60*5) # 0..1
+    if session_time < 60*60*2.5:
+        return 1
+    return 2**(-((session_time-60*60*2.5)/3600)*2)
 
 
 

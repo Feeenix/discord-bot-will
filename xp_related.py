@@ -10,12 +10,13 @@ from lib import *
 # the thread also checks if the user has leveled up, and if so, sends a message to the user once they no longer are in a voice channel
 
 def voice_xp():
+    while not client.is_ready():
+        time.sleep(1)
+
     print(client.guilds)
     for guild in client.guilds:
         if not os.path.exists(os.path.join("data/guilds/", str(guild.id))):
             initialize_guild(guild)
-
-
 
     last_poll = time.time()
     while True:
@@ -57,12 +58,13 @@ def voice_xp():
                         if member.voice.deaf: # if the user is server deafened
                             xp_modifier = 0.1
                         
-
-                        time_diff = time.time() - last_poll
-                        xp = (time_diff * settings["voicexp"] * xp_modifier)
+                        this_time = time.time()
+                        time_diff = this_time - last_poll
+                        xp_rate_modifier = xp_rate(this_time - sessions[str(member.id)])
+                        xp = (time_diff * settings["voicexp"] * xp_modifier*xp_rate_modifier)
                         add_voice_xp(guild, member.id, xp)
                         if not str(member.id) in sessions:
-                            set_voice_session_start(guild, member.id, time.time())
+                            set_voice_session_start(guild, member.id, this_time)
 
                 to_be_removed = []
                 if len(sessions) != len(active_users):

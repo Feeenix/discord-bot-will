@@ -15,6 +15,7 @@ from nextcord.ext import commands
 from nextcord import Interaction, SlashOption
 intents = nextcord.Intents.default()
 intents.message_content = True
+
 intents.members = True
 intents.guilds = True
 client = commands.Bot(intents=intents)
