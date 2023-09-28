@@ -27,6 +27,7 @@ value:int = SlashOption(description="the value of the setting, in case of boolea
 )
 async def display_leaderboard(interaction: Interaction,
 pagenum:int = SlashOption(description="Which page number to display", required = False,default=1, name="page"),
+sort:str = SlashOption(description="How to sort the leaderboard", required = False,default="xp", name="sort", choices={"xp": "xp", "time": "time", "latest": "latest"}),
                               ):
     voice_xps = load_json(os.path.join("data/guilds/", str(interaction.guild.id),"voice_xp.json"))
     len_voice_xps = len(voice_xps)
@@ -34,7 +35,7 @@ pagenum:int = SlashOption(description="Which page number to display", required =
     pagenum = max(1,min(pagenum,math.ceil(len_voice_xps/pagesize)))
     embed = make_embed(
         title=interaction.guild.name, 
-        description="This is the current practice room leaderboard.\nWho is the most hard working?\n\n"+get_pretty_voice_leaderboard(interaction.guild,(pagenum-1)*pagesize,(pagenum-1)*pagesize+pagesize) + (f"\n\nPage {pagenum}/{math.ceil(len_voice_xps/pagesize)}" if len_voice_xps > pagesize else ""),
+        description="This is the current practice room leaderboard.\nWho is the most hard working?\n\n"+get_pretty_voice_leaderboard(interaction.guild,sort,(pagenum-1)*pagesize,(pagenum-1)*pagesize+pagesize) + (f"\n\nPage {pagenum}/{math.ceil(len_voice_xps/pagesize)}" if len_voice_xps > pagesize else ""),
         color=0xfceaa8,
         author="Practice Room Leaderboard",
         thumbnail=interaction.guild.icon if interaction.guild.icon else None,
@@ -44,4 +45,46 @@ pagenum:int = SlashOption(description="Which page number to display", required =
     
 
     await interaction.response.send_message("", embed=embed)
+    return
+
+
+#, default_member_permissions=nextcord.Permissions(manage_channels=True)
+@client.slash_command(name="viewsessions",description="display a person's previous practice room sessions"
+)
+async def display_leaderboard(interaction: Interaction,
+                              user:nextcord.Member = SlashOption(description="Which user to display", required = False,default=None, name="user"),
+pagenum:int = SlashOption(description="Which page number to display", required = False,default=1, name="page"),
+                              ):
+    sessions = load_json(os.path.join("data/guilds/", str(interaction.guild.id),"practice_sessions.json"))
+    user = user if user else interaction.user
+    userID = user.id
+    if str(userID) not in sessions:
+        sessions[str(userID)] = []
+    len_user_sessions = len(sessions[str(userID)])
+    pagesize = 10
+    pagenum = max(1,min(pagenum,math.ceil(len_user_sessions/pagesize)))
+    embed = make_embed(
+        title=f"{user.global_name}'s practice sessions.", 
+        description=get_pretty_user_session_history(interaction.guild, userID,(pagenum-1)*pagesize,(pagenum-1)*pagesize+pagesize) + (f"\n\nPage {pagenum}/{math.ceil(len_user_sessions/pagesize)}" if len_user_sessions > pagesize else ""),
+        color=0xfceaa8,
+        thumbnail=user.avatar,
+        )
+    
+    # nextcord.Embed(title="Voice Leaderboard", description="this is the current voice leaderboard")
+    
+
+    await interaction.response.send_message("", embed=embed)
+    return
+
+
+#, default_member_permissions=nextcord.Permissions(manage_channels=True)
+@client.slash_command(name="revertuser",description="revert a user's stats to a previous state using the session indices"
+)
+async def revertuser(interaction: Interaction,
+                              user:nextcord.Member = SlashOption(description="Which user to display", required = True,default=None, name="user"),
+                              session_index:int = SlashOption(description="Which session index to revert to", required = True,default=None, name="session_index"),
+                              ):
+    sessions = load_json(os.path.join("data/guilds/", str(interaction.guild.id),"practice_sessions.json"))
+    user = user if user else interaction.user
+    userID = user.id
     return

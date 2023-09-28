@@ -35,8 +35,8 @@ def voice_xp():
                         continue
                     loneliness_modifier = 1
                     if len(channel.members) == 1:
-                        loneliness_modifier = 0.8
                         # if the user is alone in a voice channel
+                        loneliness_modifier = 0.8
                         # continue #? maybe we should give them xp for being alone?  
                     for member in channel.members:
                         if member.bot:
@@ -46,35 +46,40 @@ def voice_xp():
                         if member.voice.afk: # if the user is in an afk channel
                             continue
                         
-                        xp_modifier = 1
+                        xp_modifier = 1.0
                         if member.voice.self_stream: # if the user is streaming
-                            xp_modifier = 1.3
+                            xp_modifier = 1.0
                         if member.voice.self_video: # if the user is streaming
-                            xp_modifier = 1.3
+                            xp_modifier = 1.0
                         if member.voice.self_mute: # if the user is muted
-                            xp_modifier = 0.5
+                            xp_modifier = 0.1
                         if member.voice.self_deaf: # if the user is deafened
-                            xp_modifier = 0.2
+                            xp_modifier = 0.1
                         if member.voice.mute: # if the user is server muted
-                            xp_modifier = 0.2
+                            xp_modifier = 0.1
                         if member.voice.deaf: # if the user is server deafened
                             xp_modifier = 0.1
                         
                         this_time = time.time()
                         if not str(member.id) in sessions:
                             set_voice_session_start(guild, member.id, this_time)
-                            sessions[str(member.id)] = this_time
+                            sessions[str(member.id)] = {"start_time":this_time, "xp_gained":0.0, "time_unmuted":0.0}
                             print(member.id, "joined voice channel")
                         time_diff = this_time - last_poll
-                        xp_rate_modifier = xp_rate(this_time - sessions[str(member.id)])
+                        xp_rate_modifier = xp_rate(this_time - sessions[str(member.id)]["start_time"])
                         xp = (time_diff * settings["voicexp"] * xp_modifier*xp_rate_modifier*loneliness_modifier)
-                        add_voice_xp(guild, member.id, xp)
                         
-
+                        if xp_modifier == 1.0: # unmuted
+                            sessions[str(member.id)]["time_unmuted"] += time_diff
+                        sessions[str(member.id)]["xp_gained"] += xp
+                        add_voice_xp(guild, member.id, xp)
+                        add_voice_time(guild, member.id, time_diff)
+                        
+                save_json(os.path.join("data/guilds/", str(guild.id),"voice_session_time.json"), sessions)
                 to_be_removed = []
                 if len(sessions) != len(active_users):
                     for strUserID in sessions:
-                        if not strUserID in active_users:
+                        if not int(strUserID) in active_users:
                             to_be_removed.append(strUserID)
                 
                         print(strUserID, "left voice channel")
