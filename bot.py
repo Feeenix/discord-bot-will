@@ -22,7 +22,8 @@ def main():
     voice_xp_thread = threading.Thread(target=voice_xp)
     voice_xp_thread.start()
 
-
+    event_posting_loop_thread = threading.Thread(target=event_posting_loop)
+    event_posting_loop_thread.start()
 
 
 

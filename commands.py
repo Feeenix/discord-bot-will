@@ -142,3 +142,9 @@ async def unix_timestamp(interaction: Interaction,
     return
 
 
+
+
+@client.slash_command(name="createevent",description="create a practice room/vc concert event", 
+)
+async def create_event(interaction: Interaction,):
+    await interaction.response.send_modal(CreateEventModal(title="Create Practice room/VC concert event"))

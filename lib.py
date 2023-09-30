@@ -73,7 +73,7 @@ def initialize_guild(guild):
     save_json(os.path.join("data/guilds/", str(guildID),
               "voice_xp.json"), {}) # {"userid": {"xp": xp, ... etc}}}
     save_json(os.path.join("data/guilds/", str(guildID),
-              "events.json"), {}) # {"events":[{"timestamp": timestamp, "type": "message", "xp": xp, "userid": userid}, ... etc]]}
+              "events.json"), []) # [{"timestamp": timestamp, "type": "message", "xp": xp, "userid": userid}, ... etc]
     
     
 
@@ -299,6 +299,156 @@ def remove_user_sessions(guild, userID, index_1, index_2):
 
 
     return xp_removed, time_removed, amount
+
+
+def get_events_for_guild(guild):
+    guildID = guild.id
+    # if not os.path.exists(os.path.join("data/guilds/", str(guildID))):
+    #     initialize_guild(guild)
+
+    events = load_json(os.path.join("data/guilds/", str(guildID),"events.json"))
+    return events
+
+def parse_time(unparsed:str):
+    try:
+        return float(unparsed) # unix timestamp
+    except:
+        pass
+    try:
+        return datetime.datetime.fromisoformat(unparsed).timestamp()
+    except:
+        pass
+    raise ValueError("Invalid time format. Use ISO8601 format \"YYYY-MM-DDTHH:MM:SS+diff\" or unix timestamp")
+
+
+def create_event(guild,name,description,roleID,channelID,unparsed_time):
+    guildID = guild.id
+    # if not os.path.exists(os.path.join("data/guilds/", str(guildID))):
+    #     initialize_guild(guild)
+
+    try:
+        timestamp = parse_time(unparsed_time)
+    except ValueError:
+        return ("Invalid time format. Use ISO8601 format \"YYYY-MM-DDTHH:MM:SS+diff\" or unix timestamp",0)
+    
+    events = load_json(os.path.join("data/guilds/", str(guildID),"events.json"))
+    events.append({"name":name,"description":description,"roleID":roleID,"channelID":channelID,"time":timestamp})
+    save_json(os.path.join("data/guilds/", str(guildID),"events.json"), events)
+
+
+
+
+
+    return ("OK",timestamp)
+
+
+class CreateEventModal(nextcord.ui.Modal, ):
+    def __init__(self,title):
+        super().__init__(title, timeout=60*30)
+        self.field1 = nextcord.ui.TextInput(
+            label="Event Name", 
+            placeholder="Event Name", 
+            min_length=1, 
+            max_length=100,
+            style=nextcord.TextInputStyle.short,
+        )
+        self.field2 = nextcord.ui.TextInput(
+            label="Event Description", 
+            placeholder="Event Description", 
+            min_length=1, max_length=1800,
+            style=nextcord.TextInputStyle.paragraph
+        )
+        # which role to ping for the event
+        self.field3 = nextcord.ui.TextInput( 
+            label="Which role to ping?",
+            placeholder="Role name or ID",
+            min_length=1,
+            max_length=100,
+            required=False,
+            style=nextcord.TextInputStyle.short,
+        )
+        # which channel to post in
+        self.field4 = nextcord.ui.TextInput( 
+            label="Which channel to post in?",
+            placeholder="Channel name or ID",
+            min_length=1,
+            max_length=100,
+            style=nextcord.TextInputStyle.short,
+        )
+        self.field5 = nextcord.ui.TextInput(
+            label="When? (example: \"2023-09-29T20:52:33+02:00\")", 
+            # placeholder="Use ISO8601 format \"YYYY-MM-DDTHH:MM:SS+diff\" or unix timestamp.\nExample: \"2023-09-29T20:52:33+02:00\" for UTC+2, or timestamp: \"1696013553\"", 
+            placeholder="Use ISO8601 format: \"2023-09-29T20:52:33+02:00\" for UTC+2, or unix timestamp: \"1696013553\"", 
+            min_length=1, 
+            max_length=150,
+            style=nextcord.TextInputStyle.paragraph,
+        )
+
+        self.add_item(self.field1)
+        self.add_item(self.field2)
+        self.add_item(self.field3)
+        self.add_item(self.field4)
+        self.add_item(self.field5)
+
+    async def callback(self, interaction: Interaction) -> None:
+        channelnameOrID = self.field4.value
+        if channelnameOrID.startswith("#"): channelnameOrID = channelnameOrID[1:]
+        if channelnameOrID.startswith("<#") and channelnameOrID.endswith(">"):
+            channelnameOrID = (channelnameOrID[2:-1])
+            # verify that the channel exists
+        if channelnameOrID.replace(".","").isdecimal():
+            channel = interaction.guild.get_channel_or_thread(int(float(channelnameOrID)))
+            if not channel:
+                await interaction.response.send_message("Invalid channel (1)", ephemeral=True)
+                return
+            channelID = channel.id
+        else:
+            channels_in_guild = interaction.guild.channels
+            channel = None
+            channelID = None
+            for channel in channels_in_guild:
+                if channel.name.lower() == channelnameOrID.lower():
+                    channelID = channel.id
+                    break
+            if not channelID:
+                await interaction.response.send_message("Invalid channel (2)", ephemeral=True)
+                return
+        
+        
+        rolenameOrID = self.field3.value
+        if rolenameOrID != "":
+        
+            if rolenameOrID.startswith("<@&") and rolenameOrID.endswith(">"):
+                rolenameOrID = (rolenameOrID[3:-1])
+                # verify that the role exists
+            if rolenameOrID.replace(".","").isdecimal():
+                role = interaction.guild.get_role(int(float(rolenameOrID)))
+                if not role:
+                    await interaction.response.send_message("Invalid role (1)", ephemeral=True)
+                    return
+                roleID = role.id
+            else:
+                roles_in_guild = interaction.guild.roles
+                role = None
+                roleID = None
+                for role in roles_in_guild:
+                    if role.name.lower() == rolenameOrID.lower():
+                        roleID = role.id
+                        break
+                if not roleID:
+                    await interaction.response.send_message("Invalid role (2)", ephemeral=True)
+                    return
+        else:
+            roleID = 0
+
+            
+        result = create_event(interaction.guild, self.field1.value, self.field2.value, roleID, channelID, self.field5.value)
+
+        if result[0] != "OK":
+            await interaction.response.send_message(result[0], ephemeral=True)
+            return
+        await interaction.send(f"Event created for <t:{int(result[1])}:F>, named \"{self.field1.value}\"", ephemeral=False)
+
 
 if __name__ == "__main__":
     # save_json("test.json", {"cdb": "test"})

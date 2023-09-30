@@ -10,6 +10,7 @@ from lib import *
 # the thread also checks if the user has leveled up, and if so, sends a message to the user once they no longer are in a voice channel
 
 def voice_xp():
+    global guilds_initialized
     while not client.is_ready():
         time.sleep(1)
 
@@ -17,7 +18,7 @@ def voice_xp():
     for guild in client.guilds:
         if not os.path.exists(os.path.join("data/guilds/", str(guild.id))):
             initialize_guild(guild)
-
+    guilds_initialized = True
     last_poll = time.time()
     while True:
         guilds = os.listdir("data/guilds")
