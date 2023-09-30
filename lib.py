@@ -397,22 +397,58 @@ class CreateEventModal(nextcord.ui.Modal, ):
             channelnameOrID = (channelnameOrID[2:-1])
             # verify that the channel exists
         if channelnameOrID.replace(".","").isdecimal():
-            channel = interaction.guild.get_channel_or_thread(int(float(channelnameOrID)))
+            channel = interaction.guild.get_channel_or_thread(int((channelnameOrID)))
             if not channel:
                 await interaction.response.send_message("Invalid channel (1)", ephemeral=True)
                 return
             channelID = channel.id
+            if channel.type != nextcord.ChannelType.text and channel.type != nextcord.ChannelType.news:
+                await interaction.response.send_message("Invalid channel. Channel must be a text channel (4)", ephemeral=True)
+                return
         else:
             channels_in_guild = interaction.guild.channels
             channel = None
             channelID = None
-            for channel in channels_in_guild:
-                if channel.name.lower() == channelnameOrID.lower():
+            channels_for_testing = []
+
+            for guildchannel in channels_in_guild: # tests all channels without case sensitivity, puts them in channels_for_testing
+                if guildchannel.name.lower() == channelnameOrID.lower():
+                    channels_for_testing.append(guildchannel)
+            if len(channels_for_testing) == 0: # no channels found that matched
+                await interaction.response.send_message("Invalid channel (2)", ephemeral=True)
+                return
+            if len(channels_for_testing) == 1: # one channel found that matched
+                channel = channels_for_testing[0]
+                channelID = channel.id
+            else: # this means len(channels_for_testing) > 1
+                textchannels = [] # if there are multiple channels that matched, only text channels are considered
+                for guildchannel in channels_for_testing:
+                    if guildchannel.type == nextcord.ChannelType.text or guildchannel.type == nextcord.ChannelType.news:
+                        textchannels.append(guildchannel)
+                if len(textchannels) == 0: # if no text channels matched
+                    await interaction.response.send_message("Invalid channel. Channel must be a text channel (3)", ephemeral=True)
+                    return
+                if len(textchannels) == 1: # if there is only one text channel that matched
+                    channel = textchannels[0]
                     channelID = channel.id
-                    break
+                elif len(textchannels) > 1: # if there are multiple text channels that matched
+                    # test for case sensitivity
+                    for guildchannel in textchannels:
+                        if guildchannel.name == channelnameOrID:
+                            channelID = guildchannel.id
+                            channel = guildchannel
+                            break
+                    if not channelID:
+                        # if no channel matched, use the first one
+                        channel = textchannels[0]
+                        channelID = channel.id
+                    
             if not channelID:
                 await interaction.response.send_message("Invalid channel (2)", ephemeral=True)
                 return
+            if channel.type != nextcord.ChannelType.text and channel.type != nextcord.ChannelType.news:
+                await interaction.response.send_message("Invalid channel. Channel must be a text channel (3)", ephemeral=True)
+
         
         
         rolenameOrID = self.field3.value
@@ -422,7 +458,7 @@ class CreateEventModal(nextcord.ui.Modal, ):
                 rolenameOrID = (rolenameOrID[3:-1])
                 # verify that the role exists
             if rolenameOrID.replace(".","").isdecimal():
-                role = interaction.guild.get_role(int(float(rolenameOrID)))
+                role = interaction.guild.get_role(int((rolenameOrID)))
                 if not role:
                     await interaction.response.send_message("Invalid role (1)", ephemeral=True)
                     return
@@ -443,11 +479,10 @@ class CreateEventModal(nextcord.ui.Modal, ):
 
             
         result = create_event(interaction.guild, self.field1.value, self.field2.value, roleID, channelID, self.field5.value)
-
         if result[0] != "OK":
-            await interaction.response.send_message(result[0], ephemeral=True)
+            await interaction.response.send_message(result[0], ephemeral=True,)
             return
-        await interaction.send(f"Event created for <t:{int(result[1])}:F>, named \"{self.field1.value}\"", ephemeral=False)
+        await interaction.send(f"Event created for <t:{int(result[1])}:F>, named \"{self.field1.value}\"", ephemeral=False, )
 
 
 if __name__ == "__main__":
