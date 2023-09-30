@@ -321,7 +321,7 @@ def parse_time(unparsed:str):
     raise ValueError("Invalid time format. Use ISO8601 format \"YYYY-MM-DDTHH:MM:SS+diff\" or unix timestamp")
 
 
-def create_event(guild,name,description,roleID,channelID,unparsed_time):
+def create_event(guild,name,description,roleID,channelID,unparsed_time,author_id):
     guildID = guild.id
     # if not os.path.exists(os.path.join("data/guilds/", str(guildID))):
     #     initialize_guild(guild)
@@ -332,11 +332,8 @@ def create_event(guild,name,description,roleID,channelID,unparsed_time):
         return ("Invalid time format. Use ISO8601 format \"YYYY-MM-DDTHH:MM:SS+diff\" or unix timestamp",0)
     
     events = load_json(os.path.join("data/guilds/", str(guildID),"events.json"))
-    events.append({"name":name,"description":description,"roleID":roleID,"channelID":channelID,"time":timestamp})
+    events.append({"name":name,"description":description,"roleID":roleID,"channelID":channelID,"time":timestamp,"participants":[],"author_id":author_id})
     save_json(os.path.join("data/guilds/", str(guildID),"events.json"), events)
-
-
-
 
 
     return ("OK",timestamp)
@@ -478,7 +475,7 @@ class CreateEventModal(nextcord.ui.Modal, ):
             roleID = 0
 
             
-        result = create_event(interaction.guild, self.field1.value, self.field2.value, roleID, channelID, self.field5.value)
+        result = create_event(interaction.guild, self.field1.value, self.field2.value, roleID, channelID, self.field5.value,interaction.user.id)
         if result[0] != "OK":
             await interaction.response.send_message(result[0], ephemeral=True,)
             return
