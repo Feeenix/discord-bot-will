@@ -73,7 +73,7 @@ def initialize_guild(guild):
     save_json(os.path.join("data/guilds/", str(guildID),
               "voice_xp.json"), {}) # {"userid": {"xp": xp, ... etc}}}
     save_json(os.path.join("data/guilds/", str(guildID),
-              "events.json"), []) # [{"timestamp": timestamp, "type": "message", "xp": xp, "userid": userid}, ... etc]
+              "events.json"), {}) # {"event_id" :{"timestamp": timestamp, "type": "message", "xp": xp, "userid": userid}, ... etc}
     
     
 
@@ -331,8 +331,11 @@ def create_vc_room_event(guild,name,description,roleID,channelID,unparsed_time,a
     except ValueError:
         return ("Invalid time format. Use ISO8601 format \"YYYY-MM-DDTHH:MM:SS+diff\" or unix timestamp",0)
     
+    event_id = str(guildID)[0:5] +"_"+ str(int(time.time()))[-5:] +"_"+ str(author_id)[0:5]
+
+
     events = load_json(os.path.join("data/guilds/", str(guildID),"events.json"))
-    events.append({"name":name,"description":description,"roleID":roleID,"channelID":channelID,"time":timestamp,"participants":[],"author_id":author_id})
+    events[guildID] = {"name":name,"description":description,"roleID":roleID,"channelID":channelID,"time":timestamp,"participants":[],"author_id":author_id}
     save_json(os.path.join("data/guilds/", str(guildID),"events.json"), events)
 
 
