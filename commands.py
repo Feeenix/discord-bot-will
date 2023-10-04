@@ -148,3 +148,142 @@ async def unix_timestamp(interaction: Interaction,
 )
 async def create_vc_room_event(interaction: Interaction,):
     await interaction.response.send_modal(CreateEventModal(title="Create Practice room/VC concert event"))
+
+
+# @client.slash_command(name="deleteevent",description="delete a practice room/vc concert event",
+
+
+
+@client.slash_command(name="listfutureevents",description="list all future practice room/vc concert events",
+)
+async def list_future_events(interaction: Interaction,
+                            page:int = SlashOption(description="Which page number to display", required = False,default=1, name="page"),
+                             ):
+    events = get_events_for_guild(interaction.guild)
+      
+    events = [(event_id, events[event_id]) for event_id in events if events[event_id]["time"] > time.time()]
+    events.sort(key=lambda x: x[1]["time"])
+    # events = [event for event in events if event["time"] > time.time()]
+    len_events = len(events)
+    pagesize = 10
+    page = max(1,min(page,math.ceil(len_events/pagesize)))
+    embed = make_embed(
+        title=interaction.guild.name, 
+        description="This is the list of future events.\nEvents are sorted in order of what comes first.\nTo view the details of an event consider using </viewevent:1158513267396857957>\n\n"+list_future_vc_room_events(interaction.guild,(page-1)*pagesize,(page-1)*pagesize+pagesize) + (f"\n\nPage {page}/{math.ceil(len_events/pagesize)}" if len_events > pagesize else ""),
+        color=0xfceaa8,
+        author="Event List",
+        thumbnail=interaction.guild.icon if interaction.guild.icon else None,
+        )
+
+    await interaction.response.send_message("", embed=embed)
+    return
+
+@client.slash_command(name="viewevent",description="display all the info for a specific event given the id",
+)
+async def view_event(interaction: Interaction,
+                     event_id:str = SlashOption(description="The id of the event", required = True,default=None, name="event_id"),
+                             ):
+    embed = view_event_pretty(interaction.guild, event_id)
+    if type(embed) == str:
+        errorembed = make_embed(title=interaction.guild.name, 
+                      author="Event Info",
+                      description=f"Error while getting the event with the id: `{event_id}`" + (f"\n\n{embed}" if embed else ""), 
+                      color=0xfceaa8, 
+                      thumbnail=interaction.guild.icon if interaction.guild.icon else None,
+                    ) 
+        await interaction.response.send_message("", embed=errorembed)
+        return
+    await interaction.response.send_message("", embed=embed)
+    return
+
+# @client.slash_command(name="deleteevent",description="delete a practice room/vc concert event",
+# )
+# async def delete_event(interaction: Interaction,
+#                        event_id:str = SlashOption(description="The id of the event", required = True,default=None, name="event_id"),
+#                              ):
+
+@client.slash_command(name="editevent",description="edit a practice room/vc concert event",
+)
+async def edit_event(interaction: Interaction,
+                     event_id:str = SlashOption(description="The id of the event to edit", required = True,default=None, name="event_id")):
+    guildID = interaction.guild.id
+    events = load_json(os.path.join("data/guilds/", str(guildID),"events.json"))
+    if not "_" in event_id and len(event_id) == 9:
+        event_id = event_id[0:3] +"_"+ event_id[3:6] +"_"+ event_id[6:9]
+
+    if not event_id in events:
+        await interaction.response.send_message("Event not found", ephemeral=True)
+        return
+    event = events[event_id]
+    name = event["name"]
+    description = event["description"]
+    iso_time = event["iso_time"]
+    roleID = event["roleName"]
+    channelID = event["channelName"]
+    # roleID = event["roleID"]
+    # channelID = event["channelID"]
+    # await interaction.response.send_modal(CreateEventModal(title="Create Practice room/VC concert event"))
+    await interaction.response.send_modal(CreateEventModal(title="Edit Practice room/VC concert event", default_name=name, default_description=description, default_role=roleID, default_channel=channelID, default_iso_time=iso_time, event_id_edit=event_id))  
+
+
+
+@client.slash_command(name="copyevent",description="duplicate a practice room/vc concert event",
+)
+async def copy_event(interaction: Interaction,
+                     event_id:str = SlashOption(description="The id of the event to copy", required = True,default=None, name="event_id")):
+    guildID = interaction.guild.id
+    events = load_json(os.path.join("data/guilds/", str(guildID),"events.json"))
+    if not "_" in event_id and len(event_id) == 9:
+        event_id = event_id[0:3] +"_"+ event_id[3:6] +"_"+ event_id[6:9]
+
+    if not event_id in events:
+        await interaction.response.send_message("Event not found", ephemeral=True)
+        return
+    event = events[event_id]
+    name = event["name"]
+    description = event["description"]
+    iso_time = event["iso_time"]
+    roleID = event["roleName"]
+    channelID = event["channelName"]
+    # roleID = event["roleID"]
+    # channelID = event["channelID"]
+    # await interaction.response.send_modal(CreateEventModal(title="Create Practice room/VC concert event"))
+    await interaction.response.send_modal(CreateEventModal(title="Edit Practice room/VC concert event", default_name=name, default_description=description, default_role=roleID, default_channel=channelID, default_iso_time=iso_time))                  
+
+
+
+
+@client.slash_command(name="participate",description="participate in a practice room/vc concert event",)
+async def participate_in_event(interaction: Interaction,
+                     event_id:str = SlashOption(description="The id of the event to participate in", required = False,default=None, name="event_id")):
+    
+    guildID = interaction.guild.id
+    
+    if not event_id is None:
+        events = load_json(os.path.join("data/guilds/", str(guildID),"events.json"))
+        if not "_" in event_id and len(event_id) == 9:
+            event_id = event_id[0:3] +"_"+ event_id[3:6] +"_"+ event_id[6:9]
+
+        if not event_id in events:
+            await interaction.response.send_message("Event not found", ephemeral=True)
+            return
+        
+        event = events[event_id]
+        
+        
+        topic = ""
+
+        if str(interaction.user.id) in event["participants"]:
+            topic = event["participants"][str(interaction.user.id)]["topic"]
+        await interaction.response.send_modal(ParticipateInEventModal(title="Participate in Practice room/VC concert event", event_id=event_id, default_topic=topic, ))        
+    else:
+        await interaction.response.send_modal(ParticipateInEventModal(title="Participate in Practice room/VC concert event", event_id="", default_topic="", ))        
+
+
+
+
+
+
+
+
+

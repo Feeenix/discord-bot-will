@@ -311,51 +311,151 @@ def get_events_for_guild(guild):
 
 def parse_time(unparsed:str):
     try:
-        return float(unparsed) # unix timestamp
+        return float(unparsed),datetime.datetime.fromtimestamp(float(unparsed)).isoformat(timespec="seconds")  # unix timestamp
     except:
         pass
     try:
-        return datetime.datetime.fromisoformat(unparsed).timestamp()
+        return datetime.datetime.fromisoformat(unparsed).timestamp(), unparsed # iso8601
     except:
         pass
     raise ValueError("Invalid time format. Use ISO8601 format \"YYYY-MM-DDTHH:MM:SS+diff\" or unix timestamp")
 
 
-def create_vc_room_event(guild,name,description,roleID,channelID,unparsed_time,author_id):
+def create_vc_room_event(guild,name,description,roleID,channelID,unparsed_time,author_id,edit_event_id=""):
     guildID = guild.id
     # if not os.path.exists(os.path.join("data/guilds/", str(guildID))):
     #     initialize_guild(guild)
-
+    isotime = ""
     try:
-        timestamp = parse_time(unparsed_time)
+        timestamp,isotime = parse_time(unparsed_time)
     except ValueError:
-        return ("Invalid time format. Use ISO8601 format \"YYYY-MM-DDTHH:MM:SS+diff\" or unix timestamp",0)
+        return ("Invalid time format. Use ISO8601 format \"YYYY-MM-DDTHH:MM:SS+diff\" or unix timestamp",0,"")
     
-    event_id = str(guildID)[0:5] +"_"+ str(int(time.time()))[-5:] +"_"+ str(author_id)[0:5]
-
+    if not edit_event_id:
+        offset = 0
+        while True:
+            event_id = str(guildID)[0:3] +"_"+ str((int(time.time())%10000)+offset)[-3:] +"_"+ str(author_id)[0:3]
+            if not event_id in events:
+                break
+            offset += 1
+    else:
+        event_id = edit_event_id	
 
     events = load_json(os.path.join("data/guilds/", str(guildID),"events.json"))
-    events[guildID] = {"name":name,"description":description,"roleID":roleID,"channelID":channelID,"time":timestamp,"participants":[],"author_id":author_id}
+    events[event_id] = {
+        "name":name,
+        "description":description,
+        "roleID":roleID,
+        "roleName": guild.get_role(roleID).name if roleID else None,
+        "channelID":channelID,
+        "channelName": guild.get_channel(channelID).name if channelID else None,
+        "time":timestamp,
+        "participants":{},
+        "author_id":author_id, 
+        "event_id":event_id,
+        "iso_time":isotime
+        }
     save_json(os.path.join("data/guilds/", str(guildID),"events.json"), events)
 
 
-    return ("OK",timestamp)
+    return ("OK",timestamp,event_id)
+
+
+def view_event_pretty(guild,event_id):
+    guildID = guild.id
+    events = load_json(os.path.join("data/guilds/", str(guildID),"events.json"))
+    if not "_" in event_id and len(event_id) == 9:
+        event_id = event_id[0:3] +"_"+ event_id[3:6] +"_"+ event_id[6:9]
+
+    if not event_id in events:
+        return "**Event not found...**"
+    event = events[event_id]
+    participants = event["participants"]
+    if len(participants) == 0:
+        participants_str = "None yet..."
+    elif len(participants) == 1:
+        participants_str = f"<@{participants[0]['id']}>"
+    else:
+        suffix = f" and <@{participants[-1]['id']}>"
+        participants_str = ", ".join([f"<@{participant['id']}>" for participant in participants[:-1]]) + suffix
+    fields = []
+    fields.append(["Name", event["name"], False])
+    fields.append(["Description", event["description"], False])
+    fields.append(["When", f"<t:{int(event['time'])}:R>", False]) 
+    fields.append(["Registered Participants", participants_str, False])
+    fields.append(["Channel to post in", f"<#{event['channelID']}>", False])
+    fields.append(["Role to ping", f"<@&{event['roleID']}>" if event['roleID'] else "None", False])
+    fields.append(["Event created by", f"<@{event['author_id']}>", False])
+    return make_embed(title=guild.name, 
+                      author="Event Info",
+                      fields=fields, 
+                      description=f"Event with the id: `{event_id}`", 
+                      color=0xfceaa8, 
+                      thumbnail=guild.icon.url if guild.icon else None,
+                    )
+
+def list_future_vc_room_events(guild,start,end):
+    guildID = guild.id
+    events = load_json(os.path.join("data/guilds/", str(guildID),"events.json"))
+    events=list(events.items())    
+    if len(events) == 0:
+        return "**No events found...**"
+    
+    events.sort(key=lambda x: x[1]["time"])
+    events = [(event_id, event) for event_id, event in events if event["time"] > time.time()]
+
+    events = events[start:end]
+    if len(events) == 0:
+        return "**No future events found...**"
+    
+    participants_strs = {}
+    max_listed_participants = 5
+    for event_id, event in events:
+        participants = event["participants"]
+        if len(participants) == 0:
+            participants_strs[event_id] = "None yet..."
+        elif len(participants) == 1:
+            participants_strs[event_id] = f"<@{participants[0]['id']}>"
+        elif len(participants) > max_listed_participants:
+            suffix = f" + {len(participants)-max_listed_participants} more..."
+            participants_strs[event_id] = ", ".join([f"<@{participant['id']}>" for participant in participants[:max_listed_participants]]) + suffix
+        else:
+            suffix = f" and <@{participants[-1]['id']}>"
+            participants_strs[event_id] = ", ".join([f"<@{participant['id']}>" for participant in participants[:-1]]) + suffix
+
+    numbers = [f"**#{i+1}**" for i in range(start,start+len(events))]
+    names = [f"Event ID: `{event_id}`. <t:{int(event['time'])}:R>\n<:spacer:1156978605759418388>Name: {event['name']}\n<:spacer:1156978605759418388>Desc: {event['description']}\n<:spacer:1156978605759418388>Registered Participants: {participants_strs[event_id]}" for event_id, event in events]
+    
+    numbers.reverse()
+    names.reverse()
+    return "\n".join([f"{numbers[i]} → {names[i]}" for i in range(len(numbers))])
+
 
 
 class CreateEventModal(nextcord.ui.Modal, ):
-    def __init__(self,title):
+    def __init__(self,
+                 title, 
+                 default_name = "", 
+                 default_description = "", 
+                 default_role = "", 
+                 default_channel = "",
+                 default_iso_time = "",
+                 event_id_edit = ""):
         super().__init__(title, timeout=60*30)
+        self.event_id_edit = event_id_edit
         self.field1 = nextcord.ui.TextInput(
             label="Event Name", 
             placeholder="Event Name", 
             min_length=1, 
             max_length=100,
+            default_value=default_name,
             style=nextcord.TextInputStyle.short,
         )
         self.field2 = nextcord.ui.TextInput(
             label="Event Description", 
             placeholder="Event Description", 
             min_length=1, max_length=1800,
+            default_value=default_description,
             style=nextcord.TextInputStyle.paragraph
         )
         # which role to ping for the event
@@ -365,6 +465,7 @@ class CreateEventModal(nextcord.ui.Modal, ):
             min_length=1,
             max_length=100,
             required=False,
+            default_value=default_role,
             style=nextcord.TextInputStyle.short,
         )
         # which channel to post in
@@ -373,6 +474,7 @@ class CreateEventModal(nextcord.ui.Modal, ):
             placeholder="Channel name or ID",
             min_length=1,
             max_length=100,
+            default_value=default_channel,
             style=nextcord.TextInputStyle.short,
         )
         self.field5 = nextcord.ui.TextInput(
@@ -381,6 +483,7 @@ class CreateEventModal(nextcord.ui.Modal, ):
             placeholder="Use ISO8601 format: \"2023-09-29T20:52:33+02:00\" for UTC+2, or unix timestamp: \"1696013553\"", 
             min_length=1, 
             max_length=150,
+            default_value=default_iso_time if default_iso_time else (datetime.datetime.fromtimestamp(time.time()+60*60*24).isoformat(timespec="seconds")),
             style=nextcord.TextInputStyle.paragraph,
         )
 
@@ -477,12 +580,89 @@ class CreateEventModal(nextcord.ui.Modal, ):
         else:
             roleID = 0
 
-            
-        result = create_vc_room_event(interaction.guild, self.field1.value, self.field2.value, roleID, channelID, self.field5.value,interaction.user.id)
+        result = create_vc_room_event(interaction.guild, self.field1.value, self.field2.value, roleID, channelID, self.field5.value,interaction.user.id, edit_event_id=self.event_id_edit)
+        if not self.event_id_edit:
+            if result[0] != "OK":
+                await interaction.response.send_message(result[0], ephemeral=True,)
+                return
+            await interaction.send(f"Event created for <t:{int(result[1])}:F>, named \"{self.field1.value}\". eventID is `{result[2]}`", ephemeral=False, )
+        else:
+            if result[0] != "OK":
+                await interaction.response.send_message(result[0], ephemeral=True,)
+                return
+            await interaction.send(f"Event edited for <t:{int(result[1])}:F>, named \"{self.field1.value}\". eventID is `{result[2]}`", ephemeral=False, )
+        return
+    
+
+
+
+
+
+
+class ParticipateInEventModal(nextcord.ui.Modal, ):
+    def __init__(self,
+                 title, 
+                 event_id,
+                 default_topic = "", 
+                    ):
+        super().__init__(title, timeout=60*30)
+        self.field1 = nextcord.ui.TextInput(
+            label="Event ID", 
+            placeholder="111_222_333", 
+            min_length=1, 
+            max_length=100,
+            default_value=event_id,
+            style=nextcord.TextInputStyle.short,
+        )
+        self.field2 = nextcord.ui.TextInput(
+            label="What are you playing?", 
+            placeholder="rach g minor prelude", 
+            min_length=1, max_length=1800,
+            default_value=default_topic,
+            style=nextcord.TextInputStyle.paragraph
+        )
+
+        self.add_item(self.field1)
+        self.add_item(self.field2)
+    async def callback(self, interaction: Interaction) -> None:
+
+
+
+
+        events = load_json(os.path.join("data/guilds/", str(interaction.guild.id),"events.json"))
+        if not "_" in self.field1.value and len(self.field1.value) == 9:
+            self.field1.value = self.field1.value[0:3] +"_"+ self.field1.value[3:6] +"_"+ self.field1.value[6:9]
+
+        if not self.field1.value in events:
+            await interaction.response.send_message("Event not found", ephemeral=True)
+            return
+        
+        result = participate_add_to_event(interaction.guild, self.field1.value, self.field2.value, interaction.user.id)
         if result[0] != "OK":
             await interaction.response.send_message(result[0], ephemeral=True,)
             return
-        await interaction.send(f"Event created for <t:{int(result[1])}:F>, named \"{self.field1.value}\"", ephemeral=False, )
+        await interaction.send(f"You are participating in the event named: {result[1]}", ephemeral=False, )
+        return
+    
+def participate_add_to_event(guild, event_id, topic, user_id):
+    guildID = guild.id
+    events = load_json(os.path.join("data/guilds/", str(guildID),"events.json"))
+    if not "_" in event_id and len(event_id) == 9:
+        event_id = event_id[0:3] +"_"+ event_id[3:6] +"_"+ event_id[6:9]
+
+    if not event_id in events:
+        return ("Event not found...","0")
+    event = events[event_id]
+    if event["time"] < time.time():
+        return ("Event has already passed...","0")
+    
+    str_user_id = str(user_id)
+    if str_user_id in event["participants"]:
+        event["participants"][str_user_id]["topic"] = topic
+    else:
+        event["participants"][str_user_id] = {"topic":topic}
+    save_json(os.path.join("data/guilds/", str(guildID),"events.json"), events)
+    return ("OK",event["name"])
 
 
 if __name__ == "__main__":
