@@ -20,6 +20,29 @@ value:int = SlashOption(description="the value of the setting, in case of boolea
     await interaction.response.send_message("working on it")
     return
 
+@client.slash_command(name="help",description="show the list of commands",
+)
+async def help(interaction: Interaction,  
+# midifile_attachment:nextcord.Attachment = SlashOption(description="Midi file to be converted.", required = True, name="midifile_attachment"),
+# longnote:float = SlashOption(description="Sustain factor. Higher values = longer sustains. Defaults to 5", required = False,default=5, name="longnote", choices={"0": 0, "1": 1, "2": 2,"3" : 3, "4" : 4, "5 (Default)": 5, "6": 6, "7": 7, "8": 8, "9": 9, "10": 10 }),
+# timemultiply:float = SlashOption(description="Time factor. Higher values = longer songs. Defaults to 1.0", required = False,default=1.0, name="timemultiply", min_value=0.1, max_value=10.0),
+# spawnproof:int = SlashOption(description="Toggles blocking monster spawning. Defaults to false", required = False,default=False, name="spawnproof", choices = {"true": True, "false (Default)": False}),
+# tracks:int = SlashOption(description="*EXPERIMENTAL!* The number of tracks to spread notes between. Default is 14", required = False,default=14, name="tracks", choices = {"1": 1, "2": 2, "3": 3,"4" : 4, "5" : 5, "6": 6, "7": 7, "8": 8, "9": 9, "10": 10, "11": 11, "12": 12, "13": 13, "14 (Default)": 14, "15": 15, "16": 16}),
+# mp3:int = SlashOption(description="*EXPERIMENTAL!* Export as audio instead of litematic. Defaults to litematic", required = False,default=False, name="audio", choices = {"Audio file": True, "Litematica file (Default)": False}),
+
+
+):
+    # interaction.response.defer() # let the user know we're working on it
+    fields = get_pretty_commands_list()
+    embed = make_embed(title=interaction.guild.name,
+                        author="Help",
+                        description=f"Here is the list of commands:\n\n", 
+                        color=0xfceaa8, 
+                        thumbnail=interaction.guild.icon if interaction.guild.icon else None,
+                        fields=fields
+                        )
+    await interaction.response.send_message("", embed=embed)
+    return
 
 
 #, default_member_permissions=nextcord.Permissions(manage_channels=True)
@@ -61,7 +84,7 @@ pagenum:int = SlashOption(description="Which page number to display", required =
     if str(userID) not in sessions:
         sessions[str(userID)] = []
     len_user_sessions = len(sessions[str(userID)])
-    pagesize = 10
+    pagesize = 5
     pagenum = max(1,min(pagenum,math.ceil(len_user_sessions/pagesize)))
     embed = make_embed(
         title=f"{user.global_name}'s practice sessions.", 
@@ -165,11 +188,37 @@ async def list_future_events(interaction: Interaction,
     events.sort(key=lambda x: x[1]["time"])
     # events = [event for event in events if event["time"] > time.time()]
     len_events = len(events)
-    pagesize = 10
+    pagesize = 5
     page = max(1,min(page,math.ceil(len_events/pagesize)))
     embed = make_embed(
         title=interaction.guild.name, 
-        description="This is the list of future events.\nEvents are sorted in order of what comes first.\nTo view the details of an event consider using </viewevent:1158513267396857957>\n\n"+list_future_vc_room_events(interaction.guild,(page-1)*pagesize,(page-1)*pagesize+pagesize) + (f"\n\nPage {page}/{math.ceil(len_events/pagesize)}" if len_events > pagesize else ""),
+        description="This is the list of future events.\nEvents are sorted in order of what comes first.\nTo view the details of an event consider using </viewevent:1158513267396857957>\n\n"+list_vc_room_events(interaction.guild,(page-1)*pagesize,(page-1)*pagesize+pagesize) + (f"\n\nPage {page}/{math.ceil(len_events/pagesize)}" if len_events > pagesize else ""),
+        color=0xfceaa8,
+        author="Event List",
+        thumbnail=interaction.guild.icon if interaction.guild.icon else None,
+        )
+
+    await interaction.response.send_message("", embed=embed)
+    return
+
+
+
+@client.slash_command(name="listallevents",description="list all practice room/vc concert events that happened in the past or will happen in the future",
+)
+async def list_all_events(interaction: Interaction,
+                            page:int = SlashOption(description="Which page number to display", required = False,default=1, name="page"),
+                             ):
+    events = get_events_for_guild(interaction.guild)
+      
+    events = [(event_id, events[event_id]) for event_id in events if events[event_id]["time"] > time.time()]
+    events.sort(key=lambda x: x[1]["time"])
+    # events = [event for event in events if event["time"] > time.time()]
+    len_events = len(events)
+    pagesize = 5
+    page = max(1,min(page,math.ceil(len_events/pagesize)))
+    embed = make_embed(
+        title=interaction.guild.name, 
+        description="This is the list all registered events.\nEvents are sorted in order of what comes first.\nTo view the details of an event consider using </viewevent:1158513267396857957>\n\n"+list_vc_room_events(interaction.guild,(page-1)*pagesize,(page-1)*pagesize+pagesize, future=False) + (f"\n\nPage {page}/{math.ceil(len_events/pagesize)}" if len_events > pagesize else ""),
         color=0xfceaa8,
         author="Event List",
         thumbnail=interaction.guild.icon if interaction.guild.icon else None,

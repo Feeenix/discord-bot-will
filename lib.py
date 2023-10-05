@@ -262,20 +262,37 @@ def get_pretty_user_session_history(guild,userID,start,end):
     guildID = guild.id
     # if not os.path.exists(os.path.join("data/guilds/", str(guildID))):
     #     initialize_guild(guild)
-
+    currently_active_sessions = get_active_voice_sessions(guild)
+    is_in_vc = str(userID) in currently_active_sessions
+        
     practice_sessions = load_json(os.path.join("data/guilds/", str(guildID),"practice_sessions.json"))
-    if not str(userID) in practice_sessions:
+    if not str(userID) in practice_sessions and not is_in_vc:
         return "**No practice sessions found...**"
-    if len(practice_sessions[str(userID)]) == 0:
+    if len(practice_sessions[str(userID)]) == 0 and not is_in_vc:
         return "**No practice sessions found...**"
     practice_sessions = practice_sessions[str(userID)][start:end]
 
     numbers = [f"**#{i+1}**" for i in range(start,start+len(practice_sessions))]
-    names = [f"<t:{int(session['start_time'])}:D>\n<:spacer:1156978605759418388>Session time: `{format_time(session['total_time'])}`, time unmuted: `{format_time(session['of_which_time_unmuted'])}`\n<:spacer:1156978605759418388>Exp gained: `{int(session['xp_gained'])}` (current total: `{int(session['current_xp'])})`\n" for session in practice_sessions]
+    names = [(f"<t:{int(session['start_time'])}:D>"+\
+            f"\n<:spacer:1156978605759418388>Session time: `{format_time(session['total_time'])}`, time unmuted: `{format_time(session['of_which_time_unmuted'])}`"+\
+            f"\n<:spacer:1156978605759418388>Exp gained: `{int(session['xp_gained'])}` (current total: `{int(session['current_xp'])})`\n") for session in practice_sessions]
     
     numbers.reverse()
     names.reverse()
-    return "\n".join([f"{numbers[i]} → {names[i]}" for i in range(len(numbers))])
+
+# "315851790967111680": {
+#     "start_time": 1696447047.2198226,
+#     "xp_gained": 171.9957894349813,
+#     "time_unmuted": 0.0
+#   }
+    prefix = ""
+    if is_in_vc:
+        current_xp = int(get_voice_xp(guild, userID))
+        prefix = f"**Current session** → <t:{int(currently_active_sessions[str(userID)]['start_time'])}:D>"+\
+            f"\n<:spacer:1156978605759418388>Session time: `{format_time(time.time()-currently_active_sessions[str(userID)]['start_time'])}`, time unmuted: `{format_time(currently_active_sessions[str(userID)]['time_unmuted'])}`"+\
+            f"\n<:spacer:1156978605759418388>Exp gained: `{int(currently_active_sessions[str(userID)]['xp_gained'])}` (current total: `{current_xp})`\n\n"
+
+    return prefix +"\n".join([f"{numbers[i]} → {names[i]}" for i in range(len(numbers))])
 
 def remove_user_sessions(guild, userID, index_1, index_2):
     sessions = load_json(os.path.join("data/guilds/", str(guild.id),"practice_sessions.json"))
@@ -288,6 +305,11 @@ def remove_user_sessions(guild, userID, index_1, index_2):
     removing = sessions[str(userID)][index_1-1:index_2]
     xp_removed = sum([session["xp_gained"] for session in removing])
     time_removed = sum([session["total_time"] for session in removing])
+
+    for session in sessions[str(userID)][index_2:]: # update the xp and time of the sessions after the removed ones
+        session["current_xp"] -= xp_removed
+        session["current_total_time"] -= time_removed
+
     del sessions[str(userID)][index_1-1:index_2] # this is the line that actually removes the sessions
     save_json(os.path.join("data/guilds/", str(guild.id),"practice_sessions.json"), sessions)
     voicexp = load_json(os.path.join("data/guilds/", str(guild.id),"voice_xp.json"))
@@ -394,7 +416,7 @@ def view_event_pretty(guild,event_id):
                       thumbnail=guild.icon.url if guild.icon else None,
                     )
 
-def list_future_vc_room_events(guild,start,end):
+def list_vc_room_events(guild,start,end, future=True):
     guildID = guild.id
     events = load_json(os.path.join("data/guilds/", str(guildID),"events.json"))
     events=list(events.items())    
@@ -402,7 +424,8 @@ def list_future_vc_room_events(guild,start,end):
         return "**No events found...**"
     
     events.sort(key=lambda x: x[1]["time"])
-    events = [(event_id, event) for event_id, event in events if event["time"] > time.time()]
+    if future:
+        events = [(event_id, event) for event_id, event in events if event["time"] > time.time()]
 
     events = events[start:end]
     if len(events) == 0:
@@ -415,13 +438,13 @@ def list_future_vc_room_events(guild,start,end):
         if len(participants) == 0:
             participants_strs[event_id] = "None yet..."
         elif len(participants) == 1:
-            participants_strs[event_id] = f"<@{participants[0]['id']}>"
+            participants_strs[event_id] = f"<@{list(participants.keys())[0]}>"
         elif len(participants) > max_listed_participants:
             suffix = f" + {len(participants)-max_listed_participants} more..."
-            participants_strs[event_id] = ", ".join([f"<@{participant['id']}>" for participant in participants[:max_listed_participants]]) + suffix
+            participants_strs[event_id] = ", ".join([f"<@{participant}>" for participant in list(participants.keys())[:max_listed_participants]]) + suffix
         else:
-            suffix = f" and <@{participants[-1]['id']}>"
-            participants_strs[event_id] = ", ".join([f"<@{participant['id']}>" for participant in participants[:-1]]) + suffix
+            suffix = f" and <@{list(participants.keys())[-1]}>"
+            participants_strs[event_id] = ", ".join([f"<@{participant}>" for participant in list(participants.keys())[:-1]]) + suffix
 
     numbers = [f"**#{i+1}**" for i in range(start,start+len(events))]
     names = [f"Event ID: `{event_id}`. <t:{int(event['time'])}:R>\n<:spacer:1156978605759418388>Name: {event['name']}\n<:spacer:1156978605759418388>Desc: {event['description']}\n<:spacer:1156978605759418388>Registered Participants: {participants_strs[event_id]}" for event_id, event in events]
@@ -663,6 +686,39 @@ def participate_add_to_event(guild, event_id, topic, user_id):
         event["participants"][str_user_id] = {"topic":topic}
     save_json(os.path.join("data/guilds/", str(guildID),"events.json"), events)
     return ("OK",event["name"])
+
+
+def get_pretty_commands_list():
+    fields = [("**Practice time logging**", 
+               "</voiceleaderboard:1159116918637211648> → Shows the voice leaderboard.\n"+\
+               "</viewsessions:1159117001512472586> → Shows the practice session history of yourself or another user.\n"+\
+               "</removesessions:1159116920214274068> → Removes practice sessions of yourself or another user. Removal of other user's sessions requires privileges\n"               
+               ,False),
+              ("**Events**", 
+               "</participate:1159188414646718464> → Participate in an event.\n"+\
+               "</viewevent:1159116917253083236> → View details on an event.\n"+\
+               "</listfutureevents:1159116914795221093> → List future events.\n"+\
+               "</listallevents:1159243978059829358> → List all events.\n"+\
+               "</createevent:1159117003731255376> → Create an event.\n"+\
+               "</editevent:1159117000350650398> → Edit/change the specifics of an event.\n"+\
+               "</copyevent:1159127602485792909> → Copy/duplicate an event.\n"
+               
+               ,False),
+               ("**Misc**",
+                "</help:1159218778018689095> → Shows this message.\n"+\
+                "</unixtimestamp:1159117002594590776> → Converts date and time to unix timestamp.\n"
+                
+                ,False),
+               ]
+    return fields
+
+
+
+
+
+
+
+
 
 
 if __name__ == "__main__":
